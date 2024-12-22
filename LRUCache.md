@@ -49,13 +49,13 @@ implementation and maintainance.
 ### Concerns with SIMD-110
 There are a number of concerns with SIMD-110 that can be found in the discussion
 section of the proposal; they will be left out for brevity but the concerns do not
-affect the proposed mechanism.
+affect the proposed mechanism for reasons discussed below.
 
 ## New Terminology
 
 - recommended priority fee: This is the priority fee that the mechanism "recommends" that
 a transaction pay. It is calculated per account by the *priority fee recommeder* based
-on *recent fees paid*. It is similar to but distinct from the base fee in EIP-1559.
+on *recent fees paid*. It is similar to but distinct from a per account EIP-1559 base fee.
 
 - recommended high priority fee: This is the priority fee that the mechanism "recommends"
 that a transaction seeking faster-than-normal inclusion pay.
@@ -63,22 +63,23 @@ that a transaction seeking faster-than-normal inclusion pay.
 - LRUCache or simply cache: Describes an LRUCache data structure that maps the most 
 contentious accounts to the corresponding recommended priority and high priority fees.
 
-- recent fees paid: is the median fee paid per account (and globally) in the three (3) 
+- recent fees paid: is the median fee paid per account (or globally) in the three (3) 
 most recent blocks.
 
 - recent high fees paid: is the **p90** fee paid per account in the three (3) most recent
 blocks.
 
-- priority fee recommender: a gadget that determines the recommended priority fee to be paid 
-per acccount (or globally) based on the data from recent fees paid. The algorithm is 
-described in detail below.
+- priority fee recommender: a gadget that determines the `recommended priority fee` to be paid 
+per acccount (or globally) based on `recent fees paid`. The algorithm is 
+described in a following section.
 
 - contention: This describes how contentious an acccount is, for the purpose of this proposal,
 contention is simply calculated as the number of transactions writing to an account.
 
-- `getPriorityFee`: A JSON RPC method to replace the `getRecentPrioritizationFees` method.
-The `getPriorityFee` request takes a mandatory list of transactions and returns the recommended
-fee to land a transaction locking all the accounts in the list.
+- `getPriorityFee`: A JSON RPC method to replace the `getRecentPrioritizationFees` or 
+`getFeeForMessage` method. The `getPriorityFee` request takes a mandatory list of
+transactions and returns the recommended fee to land a transaction locking all the accounts 
+in the list.
 
 - `getHighPriorityFee:` A new JSON RPC method. It takes a mandatory list of accounts and returns
 a recommended priority fee to quickly land a transaction locking all the accounts in the list
@@ -92,11 +93,11 @@ SIMD-110, the fee is merely supposed to guide users on how much to bid.
 
 Functionally, the recommendation is the same as the base fee or writelock fee in EIP-1559 and SIMD-110 
 respectively, in that (given that fee markets are deterministic), it is a good reference point for users
-vying for inclusion. But it also has the benefit of allowing blocks to be maximally packed by including
-transactions that don't bid high enough. This property is important as it theoretically improves the 
-accuracy of the recommendations made by the mechanism.
+vying for inclusion. But because this fee is not enforced in protocol, it also has the benefit of 
+allowing blocks to be maximally packed by including transactions that don't bid as high as the recommendation.
+This property is important as it theoretically improves the accuracy of the recommendations made by the mechanism.
 
-Additionally, the fact that the fees are recommendations and not protocol enforced means validator nodes
+Additionally, the fact that the fees are recommendations and not protocol-enforced means validator nodes
 don't need to maintain this cache; only RPC nodes which are responsible for responding to these types
 of requests.
 
@@ -150,14 +151,17 @@ The priority fee recommender is a gadget that takes the priority fee (median or 
 three blocks and contention and returns the recommended priority or (high priority fee) for the 
 upcoming block.
 
-The gadget looks at the previous data, current contentionand based on the trends makes recommendations.
+The gadget looks at the previous data and based on the trends makes recommendations.
 The exact mathematical relation is TBD but a rough idea is that:
 
-- if the fee paid is increasing block-on-block, and contention is high, recommend a higher fee than the
+- if the fee paid is increasing block-on-block, recommend a higher fee than the
 previous block,
 - if the fee paid is reducing, and contetntion is  recommend a lower fee,
 - if the fee paid is neither increasing nor decreasing, recommend the average of the last three
 blocks.
+
+Given that transaction arrival rate can be closely modelled by a Poisson's distribution, it's likely
+that an exponential controller will be the best choice but a linear controller will be the first.
 
 ## Alternatives Considered
 
@@ -175,27 +179,28 @@ In addition to the feature above, burning the per signature base fee was also co
 of such a mechanism are debatable. Although, there are no known drawbacks.
 
 3. Excluding high priority fees.
-Excluding high priority fees was considered but it gives users and developers more expressivity without running
-into the same problems that the mechanism originally intended to tackle--an unbounded bid space.
+Excluding high priority fees and all associated data and methods was considered but it gives users and
+developers more expressivity without running into the same problems that the mechanism originally 
+intended to tackle--an unbounded bid space.
 
 4. Doing Nothing.
 Users will continue to overbid and the UX will be subpar.
 
-5. Blocking transactions that contain a fee X times less than the median.
-It's possible to write code such that RPC nodes drop all transactions with fees less than the recommended global fee.
-This has the same effect as having an in-protocol base fee. This was left out because there's not much evidence that
-suggests that users will send low-fee transactions in hopes of landing if fee markets are deterministic. Only an
-attacker would. However, should the need ever arise for this, it should be easy to add.
+5. Blocking transactions that contain a fee less than the median.
+It's possible toimplement the mechanism such that RPC nodes drop all transactions with fees less than the recommended 
+global fee. This has the same effect as having an in-protocol base fee. This was left out because there's not much 
+evidence that suggests that users will send low-fee transactions in hopes of landing if fee markets are deterministic. 
+Only an attacker would. However, should the need ever arise to add this feature, it should be easy to add.
 
-6. Having a max cap on the cache.
-At the moment, the cache is unbounded in size. Judging from the number of contentious accounts on mainnet-beta, it's unlikely
-that the cache will be very large but in the future it might be necessary to sacrifice some efficiency by setting a limit on
-the cache size. In such a scenario, when the cache is updated at the end of every slot, the bottom X accounts can be replaced
-by the most contentious accounts in the new block.
+6. Having a max cap on the cache size.
+At the moment, the cache is unbounded in size. Judging from the number of contentious accounts on mainnet-beta, it's 
+unlikely that the cache will be very large but in the future it might be necessary to sacrifice some efficiency by setting 
+a limit on the cache size. In such a scenario, when the cache is updated at the end of every slot, the bottom X accounts 
+can be replaced by the most contentious accounts in the new block.
 
 7. Using contention to scale the recommendations.
-In the current calculation for recommended fee contetrntion is not explicitly considered, it can be useful as more contentious
-accounts should have prices raised more aggressively.
+In the current calculation for recommended fee contetrntion is not explicitly considered, it can be useful as more 
+contentious accounts should have prices raised more aggressively.
 
 ## Impact
 
