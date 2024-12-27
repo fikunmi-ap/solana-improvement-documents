@@ -32,7 +32,7 @@ to move in that direction on Solana a la SIMD-110. However, salient
 concerns around the proposal have been raised. In addition, SIMD-110 is an 
 "invasive" change as it requires changing parts of Solana core.
 
-The most minimal implementation that can achieve the same effects as 
+A less invasive implementation that can achieve the same effects as 
 (or better than) EIP-1559 and by extension SIMD-110 without the externalities 
 of SIMD-110 is highly desirable.
 
@@ -131,18 +131,18 @@ When an RPC node receives `b_n`, it:
 
 - Accounts with their most recent entry older than three blocks i.e., the most recent entry is from a block
 `b_i` where i > 3, are evicted from the cache. This is done because an account that does not have any
-transactions in the last three blocks that suggests one of two things:
+transactions in the last three blocks suggests one of two things:
 
   1. The account is no longer contentious and all future accesses should be priced based on global
   fees
-  2. The global median fee has risen above the recommended fee for that account in whcih case, users
+  2. The global median fee has risen above the recommended fee for that account in which case, users
   should pay the recommended median fee.
 
 - If the recommended fee for an account in the cache is less than the global median, the account is
 evicted from the cache.
 
 #### Cache updates
-- accounts with both median and  p90 values higher than the global median are added to the cache or updated.
+- accounts with both median and p90 values higher than the global median are added to the cache or updated.
 - accounts with stale data are evicted.
 
 ### Priority Fee Recommender
@@ -179,9 +179,9 @@ In addition to the feature above, burning the per signature base fee was also co
 of such a mechanism are debatable. Although, there are no known drawbacks.
 
 3. Excluding high priority fees.
-Excluding high priority fees and all associated data and methods was considered but it gives users and
+Excluding high priority fees and all associated data and methods was considered, but it gives users and
 developers more expressiveness without running into the same problems that the mechanism originally 
-intended to tackle--an unbounded bid space.
+intended to tackle -- an unbounded bid space.
 
 4. Doing Nothing.
 Users will continue to overbid and the UX will be subpar.
