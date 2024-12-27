@@ -19,11 +19,11 @@ JSON RPC API that will allow users to make informed bids for the state they
 want to access.
 
 Importantly, the design of the mechanism is such that there is no additional
-overhead on voting nodes and it will always maximize blockspace utilization.
+overhead on voting nodes, and it will always maximize blockspace utilization.
 
 ## Motivation
 
-The current implementation of Solana's fee market is a pure firtst price auction
+The current implementation of Solana's fee market is a pure first price auction
 (FPA) and there is theoretical and empirical evidence to the fact this mechanism
 is suboptimal.
 
@@ -34,17 +34,17 @@ concerns around the proposal have been raised. In addition, SIMD-110 is an
 
 The most minimal implementation that can achieve the same effects as 
 (or better than) EIP-1559 and by extension SIMD-110 without the externalities 
-of SIMD-110 is highly desireable.
+of SIMD-110 is highly desirable.
 
 ### Effectiveness as a TFM
 Research suggests that that "first-price auctions with an exogenously restricted 
 bid space are the only static credible mechanisms". In short, all blockchains should
 strive to implement TFMs that model FPAs with restricted bid spaces.
 
-### Mininalism
+### Minimalism
 When working on (especially complex) systems, solutions that affect smaller portions
 of code are always favored over their counterparts for simplicity and ease of
-implementation and maintainance.
+implementation and maintenance.
 
 ### Concerns with SIMD-110
 There are a number of concerns with SIMD-110 that can be found in the discussion
@@ -54,7 +54,7 @@ affect the proposed mechanism for reasons discussed below.
 ## New Terminology
 
 - recommended priority fee: This is the priority fee that the mechanism "recommends" that
-a transaction pay. It is calculated per account by the *priority fee recommeder* based
+a transaction pay. It is calculated per account by the *priority fee recommender* based
 on *recent fees paid*. It is similar to but distinct from a per account EIP-1559 base fee.
 
 - recommended high priority fee: This is the priority fee that the mechanism "recommends"
@@ -70,10 +70,10 @@ most recent blocks.
 blocks.
 
 - priority fee recommender: a gadget that determines the `recommended priority fee` to be paid 
-per acccount (or globally) based on `recent fees paid`. The algorithm is 
+per account (or globally) based on `recent fees paid`. The algorithm is 
 described in a following section.
 
-- contention: This describes how contentious an acccount is, for the purpose of this proposal,
+- contention: This describes how contentious an account is, for the purpose of this proposal,
 contention is simply calculated as the number of transactions writing to an account.
 
 - `getPriorityFee`: A JSON RPC method to replace the `getRecentPrioritizationFees` or 
@@ -91,7 +91,7 @@ At the core of this proposal is an LRUCache that maps accounts to the recommende
 enforcing that transactions pay at least this fee to be included in a block ala EIP-1559 or
 SIMD-110, the fee is merely supposed to guide users on how much to bid.
 
-Functionally, the recommendation is the same as the base fee or writelock fee in EIP-1559 and SIMD-110 
+Functionally, the recommendation is the same as the base fee or write-lock fee in EIP-1559 and SIMD-110 
 respectively, in that (given that fee markets are deterministic), it is a good reference point for users
 vying for inclusion. But because this fee is not enforced in protocol, it also has the benefit of 
 allowing blocks to be maximally packed by including transactions that don't bid as high as the recommendation.
@@ -117,14 +117,14 @@ When an RPC node receives a `getPriorityFee` request, based on the request it:
 - if none of the accounts in the list are in the cache then it simply returns the recommended
 global priority fee.
 - if one or more of the accounts in the list are in the cache, then it returns the recommended
-per account priority or high priority fee for the most contentious account (should also 
+per-account priority or high priority fee for the most contentious account (should also 
 be the most expensive).
 
 ### RPC Processing Blocks
 
 When an RPC node receives `b_n`, it:
 - calculates the global median.
-- calculates the per account median for transactions in the block
+- calculates the per-account median for transactions in the block
 - updates the cache with recommendations for `b_n+1`
 
 #### Cache Eviction Policy
@@ -138,7 +138,7 @@ transactions in the last three blocks that suggests one of two things:
   2. The global median fee has risen above the recommended fee for that account in whcih case, users
   should pay the recommended median fee.
 
-- If the recommended fee for an accont in the cache is less than the global median, the account is
+- If the recommended fee for an account in the cache is less than the global median, the account is
 evicted from the cache.
 
 #### Cache updates
@@ -156,7 +156,7 @@ The exact mathematical relation is TBD but a rough idea is that:
 
 - if the fee paid is increasing block-on-block, recommend a higher fee than the
 previous block,
-- if the fee paid is reducing, and contetntion is  recommend a lower fee,
+- if the fee paid is reducing, and contention is increasing, recommend a lower fee,
 - if the fee paid is neither increasing nor decreasing, recommend the average of the last three
 blocks.
 
@@ -180,33 +180,33 @@ of such a mechanism are debatable. Although, there are no known drawbacks.
 
 3. Excluding high priority fees.
 Excluding high priority fees and all associated data and methods was considered but it gives users and
-developers more expressivity without running into the same problems that the mechanism originally 
+developers more expressiveness without running into the same problems that the mechanism originally 
 intended to tackle--an unbounded bid space.
 
 4. Doing Nothing.
 Users will continue to overbid and the UX will be subpar.
 
 5. Blocking transactions that contain a fee less than the median.
-It's possible toimplement the mechanism such that RPC nodes drop all transactions with fees less than the recommended 
+It's possible to implement the mechanism such that RPC nodes drop all transactions with fees less than the recommended 
 global fee. This has the same effect as having an in-protocol base fee. This was left out because there's not much 
 evidence that suggests that users will send low-fee transactions in hopes of landing if fee markets are deterministic. 
 Only an attacker would. However, should the need ever arise to add this feature, it should be easy to add.
 
 6. Having a max cap on the cache size.
-At the moment, the cache is unbounded in size. Judging from the number of contentious accounts on mainnet-beta, it's 
+At the moment, the cache size is unbounded. Judging from the number of contentious accounts on mainnet-beta, it's 
 unlikely that the cache will be very large but in the future it might be necessary to sacrifice some efficiency by setting 
 a limit on the cache size. In such a scenario, when the cache is updated at the end of every slot, the bottom X accounts 
 can be replaced by the most contentious accounts in the new block.
 
 7. Using contention to scale the recommendations.
-In the current calculation for recommended fee contetrntion is not explicitly considered, it can be useful as more 
+In the current calculation for recommended fee contention is not explicitly considered, it can be useful as more 
 contentious accounts should have prices raised more aggressively.
 
 ## Impact
 
 - validators: unaffected
 - core contributors: unaffected
-- RPC Nodes: They improve transaction landing probabilty for users.
+- RPC Nodes: They improve transaction landing probability for users.
 - users: Users can make better-informed bids.
 - dapp developers: they will have to switch to the new method and conform to it's format
 
