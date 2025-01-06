@@ -2,7 +2,7 @@
 simd: 'XXXX'
 title: Restrict Transaction Fee Bid Space
 authors:
-  - Ajayi-Peters Oluwafikunmi (Eclipse)
+ - Ajayi-Peters Oluwafikunmi (Eclipse)
 category: Standard
 type: Interface
 status: Draft
@@ -14,7 +14,7 @@ extends:
 
 ## Summary
 
-This proposal outlines a data structure, algorithm and breaking change to the 
+This proposal outlines a data structure, algorithm, and breaking change to the
 JSON RPC API that will allow users to make informed bids for the state they
 want to access.
 
@@ -23,60 +23,60 @@ overhead on voting nodes, and it will always maximize blockspace utilization.
 
 ## Motivation
 
-The current implementation of Solana's fee market is a pure first price auction
-(FPA) There is theoretical and empirical evidence to the fact this mechanism
+The current implementation of Solana's fee market is a pure first-price auction
+(FPA) There is theoretical and empirical evidence for the fact this mechanism
 is suboptimal. The theory suggests that the ideal TFM in the blockchain setting
-is a FPA with a restricted bidspace. Given that Ethereum solved the same problem 
-with an implementation of such a mecchanism a la EIP-1559, there has been discussions
-to replicate the EIP-1559 mechanism on Solana. 
+is an FPA with a restricted bid space. Given that Ethereum solved the same problem
+with an implementation of such a mechanism a la EIP-1559, there have been discussions
+to replicate the EIP-1559 mechanism on Solana.
 
 Unfortunately, naive replication of the 1559 mechanism is however faced with
 problems as Solana is a multi-resource (contextually: local fee-market) environment.
 Because of this copying EIP-1559's core mechanism (as is) will prove to be ineffective.
 
 In addition, EIP-1559 is a somewhat invasive change as it requires modification of the
-core protocol. A less invasive implementation that can achieve the same effects as 
+core protocol. A less invasive implementation that can achieve the same effects as
 (or better than) EIP-1559 without the externalities of SIMD-110 is highly desirable.
 
 ### Effectiveness as a TFM
-Research suggests that that "first-price auctions with an exogenously restricted 
+Research suggests that "first-price auctions with an exogenously restricted
 bid space are the only static credible mechanisms". In short, all blockchains should
 strive to implement TFMs that model FPAs with restricted bid spaces.
 
 ### Minimalism
 When working on (especially complex) systems, solutions that affect smaller portions
-of the systemare always favored over their counterparts for simplicity and ease of
+of the system are always favored over their counterparts for simplicity and ease of
 implementation and maintenance.
 
 ## New Terminology
 
 - recommended priority fee: This is the priority fee that the mechanism "recommends" that
 a transaction pay. It is calculated per account by the *priority fee recommender* based
-on *recent fees paid*. It is similar to but distinct from a per account EIP-1559 base fee.
+on *recent fees paid*. It is similar to but distinct from a per-account EIP-1559 base fee.
 
 - recommended high priority fee: This is the priority fee that the mechanism "recommends"
 that a transaction seeking faster-than-normal inclusion pay. It is a counterpart to the
 recommended priority fee for users seeking faster inclusion and or priority.
 
-- cache: Describes a cache that maps the most contentious accounts to the corresponding 
-recommended priority and high priority fees.
+- cache: Describes a cache that maps the most contentious accounts to the corresponding
+recommended priority and high-priority fees.
 
-- recent fees paid: is the median fee paid per account (or globally) in the three (3) 
+- recent fees paid: is the median fee paid per account (or globally) in the three (3)
 most recent blocks.
 
 - recent high fees paid: is the **p90** fee paid per account in the three (3) most recent
 blocks.
 
-- priority fee recommender: a gadget that determines the `recommended priority fee` to be paid 
-per account (or globally) based on `recent fees paid`. The algorithm is 
+- priority fee recommender: a gadget that determines the `recommended priority fee` to be paid
+per account (or globally) based on `recent fees paid`. The algorithm is
 described in a following section.
 
-- contention: This describes how contentious an account is, for the purpose of this proposal,
+- contention: This describes how contentious an account is, for this proposal,
 contention is simply calculated as the number of transactions writing to an account.
 
-- `getPriorityFee`: A JSON RPC method to replace the `getRecentPrioritizationFees` or 
+- `getPriorityFee`: A JSON RPC method to replace the `getRecentPrioritizationFees` or
 `getFeeForMessage` method. The `getPriorityFee` request takes a mandatory list of
-transactions and returns the recommended fee to land a transaction locking all the accounts 
+transactions and returns the recommended fee to land a transaction locking all the accounts
 in the list.
 
 - `getHighPriorityFee:` A new JSON RPC method. It takes a mandatory list of accounts and returns
@@ -84,22 +84,22 @@ a recommended priority fee to quickly land a transaction locking all the account
 
 ## Detailed Design
 
-At the core of this proposal is an cache that maps accounts to the recommended priority fee 
+At the core of this proposal is a cache that maps accounts to the recommended priority fee
 (calculation discussed below). The fee is described as a recommendation because rather than
-enforcing that transactions pay (at least) this fee to be included in a block ala EIP-1559 
+enforcing that transactions pay (at least) this fee to be included in a block ala EIP-1559
 the fee is supposed to guide users on how much to bid.
 
 While simpler, functionally, the recommended fee is the same as the base fee in EIP-1559
-in that (given that fee markets are deterministic), it is a good reference point for users 
+in that (given that fee markets are deterministic), it is a good reference point for users
 vying for inclusion.
 
-The defining benefit of this design from a TFM point of view is that because this fee is not 
-enforced in protocol, it is much more responsive to the market than EIP-1559. It also allows 
+The defining benefit of this design from a TFM point of view is that because this fee is not
+enforced in protocol, it is much more responsive to the market than EIP-1559. It also allows
 blocks to be maximally packed at all times (undesired in EIP-1559) by including transactions
 that don't bid as high as the recommendation.
 
-Additionally, the fact that the fees are recommendations and not protocol-enforced means validator 
-nodes don't need to maintain this cache or even  be aware of it; only RPC nodes which are 
+Additionally, the fact that the fees are recommendations and not protocol-enforced means validator
+nodes don't need to maintain this cache or even  be aware of it; only RPC nodes that are
 traditionally responsible for responding to these types of requests.
 
 ### The cache
@@ -109,8 +109,8 @@ struct.
 
 Let the most recent block seen by the RPC node be `b_n`,
 
-  the `fee_data` struct contains the recommended fee `f_r` for `b_n + 1` and the median and p90 fees
-  for the corresponding account in the last three blocks (`b_n`, `b_n-1`, `b_n-2`).
+ the `fee_data` struct contains the recommended fee `f_r` for `b_n + 1` and the median and p90 fees
+ for the corresponding account in the last three blocks (`b_n`, `b_n-1`, `b_n-2`).
 
 ### RPC Processing Requests
 
@@ -119,7 +119,7 @@ When an RPC node receives a `getPriorityFee` request, based on the request it:
 - if none of the accounts in the list are in the cache then it simply returns the recommended
 global priority fee.
 - if one or more of the accounts in the list are in the cache, then it returns the recommended
-per-account priority or high priority fee for the most contentious account (should also 
+per-account priority or high-priority fee for the most contentious account (should also
 be the most expensive).
 
 ### RPC Processing Blocks
@@ -135,10 +135,10 @@ When an RPC node receives `b_n`, it:
 `b_i` where n-i > 3, are evicted from the cache. This is done because an account that does not have any
 transactions in the last three blocks suggests one of two things:
 
-  1. The account is no longer contentious and all future accesses should be priced based on global
-  fees.
-  2. The global median fee has risen above the recommended fee for that account in which case, users
-  should pay the recommended median fee.
+ 1. The account is no longer contentious and all future accesses should be priced based on global
+ fees.
+ 2. The global median fee has risen above the recommended fee for that account in which case, users
+ should pay the recommended median fee.
 
 - If the recommended fee for an account in the cache is less than the global median, the account is
 evicted from the cache.
@@ -146,7 +146,7 @@ evicted from the cache.
 ### Priority Fee Recommender
 
 The priority fee recommender is a gadget that takes the priority fee (median or p90) for the last
-three blocks and contention and returns the recommended priority or (high priority fee) for the 
+three blocks and contention and returns the recommended priority or (high priority fee) for the
 upcoming block.
 
 The gadget looks at the previous data and based on the trends makes recommendations.
@@ -158,7 +158,7 @@ previous block,
 - if the fee paid is neither increasing nor decreasing, recommend the average of the last three
 blocks.
 
-Given that transaction arrival rate can be closely modelled by a Poisson's distribution, an
+Given that transaction arrival rate can be closely modeled by a Poisson's distribution, an
 exponential controller is the best choice for a governor
 
 ## Alternatives Considered
@@ -166,8 +166,8 @@ exponential controller is the best choice for a governor
 What alternative designs were considered and what pros/cons does this feature
 have relative to them?
 
-1. EIP-1559 like system with sta protocol-enforced base fee.
-The primary alternative consideration is a per account EIP-1559 implementation. But fpr reasons
+1. EIP-1559-like system with sta protocol-enforced base fee.
+The primary alternative consideration is a per-account EIP-1559 implementation. But for reasons
 already discussed in the main body of this text, the proposed implementation is superior to
 EIP-1559.
 
@@ -175,9 +175,9 @@ EIP-1559.
 In addition to the features above, burning the per signature base fee was also considered but the benefits
 of such a mechanism are debatable. Although, there are no known drawbacks.
 
-3. Excluding high priority fees.
-Excluding high priority fees and all associated data and methods was considered.
-However users generally fall into one of two classes--users that want to pay the minimum amount required to
+3. Excluding high-priority fees.
+Excluding high-priority fees and all associated data and methods was considered.
+However, users generally fall into one of two classes--users who want to pay the minimum amount required to
 be included in the next block and users willing to pay extra for some priority. The recommended priority fee
 serves the first class while the high priority fee serves the second.
 
@@ -186,18 +186,18 @@ Users will continue to overbid (best case) and the UX will continue to be subpar
 
 5. Blocking transactions that contain a fee less than the median.
 It's possible to implement the mechanism such that RPC nodes drop all transactions with fees less than the recommended
-global fee. This has the same effect as having an in-protocol base fee. This was left out because there's not much 
+global fee. This has the same effect as having an in-protocol base fee. This was left out because there's not much
 evidence that suggests that users will send low-fee transactions in hopes of landing if fee markets are deterministic.
 However, should the need ever arise to add this feature, it should be trivial to do so.
 
 6. Having a max cap on the cache size.
-At the moment, the cache size is unbounded. Judging from the number of contentious accounts on mainnet-beta, it's 
-unlikely that the cache will be very large but in the future it might be necessary to sacrifice some efficiency by setting 
-a limit on the cache size. In such a scenario, when the cache is updated at the end of every slot, the bottom X accounts 
+At the moment, the cache size is unbounded. Judging from the number of contentious accounts on mainnet-beta, it's
+unlikely that the cache will be very large but in the future, it might be necessary to sacrifice some efficiency by setting
+a limit on the cache size. In such a scenario, when the cache is updated at the end of every slot, the bottom X accounts
 can be replaced by the most contentious accounts in the new block.
 
 7. Using contention to scale the recommendations.
-In the current calculation for recommended fee contention is not explicitly considered, it can be useful as more 
+In the current calculation for recommended fee contention is not explicitly considered, it can be useful as more
 contentious accounts should have prices raised more aggressively.
 
 ## Impact
@@ -220,4 +220,4 @@ While it only affects non-critical parts of the codebase, this is still a comple
 
 For the sake of adoption, this proposal favors deprecating other fee request RPC methods so
 developers use this one and bids are standardized. That means the implementation might not be
-backwards compatible.
+backward compatible.
