@@ -232,7 +232,7 @@ if $\mu^g_{\tau} > \mu^g_{\lambda}$,\
 $\ \ \ \ f^g_o = f^g_n * exp(\theta, \ (\frac{\mu^g_{\lambda}}{\mu^g_{\tau}} -1))$
 
 if $\mu^g_{\tau} < \mu^g_{\lambda}$,\
-$\ \ \ \ f^g_o = f^g_n * (1 - exp(\theta, \ (\frac{\mu^g_{\lambda}}{\mu^g_{\tau}} -1)))$
+$\ \ \ \ f^g_o = f^g_n * (1 - exp(\theta, \ (\frac{\mu^g_{\lambda}}{\mu^g_{\tau}} -1)))$  
 
 let $n$ be the most recent block seen by the node (such that the next block is
 $o$)\
