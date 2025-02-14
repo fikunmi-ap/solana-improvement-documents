@@ -234,6 +234,10 @@ $\ \ \ \ f^g_o = f^g_n * exp(\theta, \ (\frac{\mu^g_{\lambda}}{\mu^g_{\tau}} -1)
 if $\mu^g_{\tau} < \mu^g_{\lambda}$,\
 $\ \ \ \ f^g_o = f^g_n * (1 - exp(\theta, \ (\frac{\mu^g_{\lambda}}{\mu^g_{\tau}} -1)))$  
 
+
+The recommended global fee for block $o$ is a bit more involved because it must
+also consider global fees but it is determined by equations 3 and 4:  
+
 let $n$ be the most recent block seen by the node (such that the next block is
 $o$)\
 let $f^{\alpha}_n$ be the median fee for account $\alpha$ in block $n$\
@@ -243,8 +247,6 @@ over the last five blocks\
 let $\mu^{\alpha}_{\tau}$ be the target per block CU utilization\
 let $\theta$ be a sensitivity parameter
 
-The recommended global fee for block $o$ is a bit more involved because it must
-also consider global fees but it is determined by:\
 if $\mu^{\alpha}_{\tau} > \mu^{\alpha}_{\lambda}$,\
 $\ \ \ \ f^{\alpha}_o = max \ \{f^{\alpha}_n * exp(\theta, \ (\frac{\mu^{\alpha}_{\lambda}}{\mu^{\alpha}_{\tau}} -1)), \ f^g_o \}$
 
