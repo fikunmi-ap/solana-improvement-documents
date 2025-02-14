@@ -236,10 +236,10 @@ $\ \ \ \ f^g_o = f^g_n * (1 - exp(\theta, \ (\frac{\mu^g_{\lambda}}{\mu^g_{\tau}
 
 
 The recommended global fee for block $o$ is a bit more involved because it must
-also consider global fees but it is determined by equations 3 and 4:  
-
+also consider global fees but it is determined by the following equations:
+  
 let $n$ be the most recent block seen by the node (such that the next block is
-$o$)\
+$o$)  
 let $f^{\alpha}_n$ be the median fee for account $\alpha$ in block $n$\
 let $f^{\alpha}_o$ be the recommended global fee for block $o \ni o = n + 1$\
 let $\mu^{\alpha}_{\lambda}$ be the EMA of CU utilization for account ${\alpha}$
