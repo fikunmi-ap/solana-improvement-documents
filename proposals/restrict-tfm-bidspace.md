@@ -237,20 +237,20 @@ $\ \ \ \ f^g_o = f^g_n * (1 - exp(\theta, \ (\frac{\mu^g_{\lambda}}{\mu^g_{\tau}
 
 The recommended global fee for block $o$ is a bit more involved because it must
 also consider global fees but it is determined by the following equations:
-  
+
 let $n$ be the most recent block seen by the node (such that the next block is
 $o$)  
-let $f^{\alpha}_n$ be the median fee for account $\alpha$ in block $n$\
-let $f^{\alpha}_o$ be the recommended global fee for block $o \ni o = n + 1$\
+let $f^{\alpha}_n$ be the median fee for account $\alpha$ in block $n$  
+let $f^{\alpha}_o$ be the recommended global fee for block $o \ni o = n + 1$  
 let $\mu^{\alpha}_{\lambda}$ be the EMA of CU utilization for account ${\alpha}$
-over the last five blocks\
-let $\mu^{\alpha}_{\tau}$ be the target per block CU utilization\
-let $\theta$ be a sensitivity parameter
+over the last five blocks  
+let $\mu^{\alpha}_{\tau}$ be the target per block CU utilization  
+let $\theta$ be a sensitivity parameter  
 
-if $\mu^{\alpha}_{\tau} > \mu^{\alpha}_{\lambda}$,\
+if $\mu^{\alpha}_{\tau} > \mu^{\alpha}_{\lambda}$,
 $\ \ \ \ f^{\alpha}_o = max \ \{f^{\alpha}_n * exp(\theta, \ (\frac{\mu^{\alpha}_{\lambda}}{\mu^{\alpha}_{\tau}} -1)), \ f^g_o \}$
 
-if $\mu^{\alpha}_{\tau} < \mu^{\alpha}_{\lambda}$,\
+if $\mu^{\alpha}_{\tau} < \mu^{\alpha}_{\lambda}$,
 $\ \ \ \ f^{\alpha}_o = max \ \{f^{\alpha}_n * (1 - exp(\theta, \ (\frac{\mu^{\alpha}_{\lambda}}{\mu^{\alpha}_{\tau}} -1))), \ f^g_o \}$
 
 As is observable from the above, the controller is exponential. An exponential
