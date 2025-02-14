@@ -66,7 +66,7 @@ bid space without any of the externalities discussed above is highly desirable.
     Unit utilization (per account and per block).
 
 -   fee: fee is used loosely throughout this document to refer to Compute Unit
-    cost.
+    cost (lamports/CU).
 
 -   recommended priority fee: This is the fee that the mechanism "recommends"
     that a transaction pay. It is similar to but distinct from a per-account
@@ -243,12 +243,13 @@ over the last five blocks\
 let $\mu^{\alpha}_{\tau}$ be the target per block CU utilization\
 let $\theta$ be a sensitivity parameter
 
-The recommended per-account fee for block $o$ is determined by:\
+The recommended global fee for block $o$ is a bit more involved because it must
+also consider global fees but it is determined by:\
 if $\mu^{\alpha}_{\tau} > \mu^{\alpha}_{\lambda}$,\
-$\ \ \ \ f^{\alpha}_o = f^{\alpha}_n * exp(\theta, \ (\frac{\mu^{\alpha}_{\lambda}}{\mu^{\alpha}_{\tau}} -1))$
+$\ \ \ \ f^{\alpha}_o = max \ \{f^{\alpha}_n * exp(\theta, \ (\frac{\mu^{\alpha}_{\lambda}}{\mu^{\alpha}_{\tau}} -1)), \ f^g_o \}$
 
 if $\mu^{\alpha}_{\tau} < \mu^{\alpha}_{\lambda}$,\
-$\ \ \ \ f^{\alpha}_o = f^{\alpha}_n * (1 - exp(\theta, \ (\frac{\mu^{\alpha}_{\lambda}}{\mu^{\alpha}_{\tau}} -1)))$
+$\ \ \ \ f^{\alpha}_o = max \ \{f^{\alpha}_n * (1 - exp(\theta, \ (\frac{\mu^{\alpha}_{\lambda}}{\mu^{\alpha}_{\tau}} -1))), \ f^g_o \}$
 
 As is observable from the above, the controller is exponential. An exponential
 controller was chosen for two reasons:
