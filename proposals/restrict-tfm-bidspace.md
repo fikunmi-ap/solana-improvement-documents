@@ -240,11 +240,11 @@ also consider global fees but it is determined by the following equations:
 
 let $n$ be the most recent block seen by the node (such that the next block is
 $o$)  
-let $f^{\alpha}_n$ be the median fee for account $\alpha$ in block $n$  
-let $f^{\alpha}_o$ be the recommended global fee for block $o \ni o = n + 1$  
-let $\mu^{\alpha}_{\lambda}$ be the EMA of CU utilization for account ${\alpha}$
+let $f^{\alpha}\_n$ be the median fee for account $\alpha$ in block $n$  
+let $f^{\alpha}\_o$ be the recommended global fee for block $o \ni o = n + 1$  
+let $\mu^{\alpha}\_{\lambda}$ be the EMA of CU utilization for account ${\alpha}$
 over the last five blocks  
-let $\mu^{\alpha}_{\tau}$ be the target per block CU utilization  
+let $\mu^{\alpha}\_{\tau}$ be the target per block CU utilization  
 let $\theta$ be a sensitivity parameter  
 
 if $\mu^{\alpha}\_{\tau} > \mu^{\alpha}\_{\lambda}$,  
