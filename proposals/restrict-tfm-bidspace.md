@@ -297,7 +297,11 @@ That is a complete overview of all the components of the design.
 
 ## Alternatives Considered
 
-1.  EIP-1559-like system with a protocol-enforced base fee. The primary
+1.  Using a different controller: While the core design is fixed, the controller
+    is a modifiable component. This design was chosen because it is the simplest
+    that would satisfy the desiderata. PID controllers are potential improvement.
+    
+2.  EIP-1559-like system with a protocol-enforced base fee. The primary
     alternative consideration is a per-account EIP-1559 implementation. But for
     reasons already discussed in the main body of this text, the proposed
     implementation is superior to per-account EIP-1559.
