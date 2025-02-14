@@ -1,6 +1,6 @@
 ---
 simd: 'XXXX'
-title: Restrict Transaction Fee Bid Space
+title: Restrict Transaction Fee Market Bid Space
 authors:
  - Ajayi-Peters Oluwafikunmi (Eclipse)
 category: Standard
@@ -14,107 +14,88 @@ extends:
 
 ## Summary
 
-This proposal outlines a data structure, algorithm, and breaking change to the
-JSON RPC API that will allow users to make informed bids for the state they
-want to access.
-
+This proposal makes breaking changes to the RPC API, and introduces a target 
+utilization amount to Solana's TFM to improve fee paying and inclusion UX.
 Importantly, the design of the mechanism is such that there is no additional
 overhead on voting nodes, and it will always maximize blockspace utilization.
 
 ## Motivation
 
-The current implementation of Solana's fee market is a pure first-price auction
-(FPA) There is theoretical and empirical evidence for the fact this mechanism
-is suboptimal. The theory suggests that the ideal TFM in the blockchain setting
-is an FPA with a restricted bid space. Given that Ethereum solved the same problem
-with an implementation of such a mechanism a la EIP-1559, there have been discussions
-to replicate the EIP-1559 mechanism on Solana.
+The vast majority of Solana transactions overpay for inclusion because there is
+little guidiance on how much they need to pay. Another set of transactions
+never make it on-chain because even though they were willling to pay the price for
+inclusion, they were unaware of it. The UX degrades further during
+periods of high activity and some users are effectively locked out of the chain.
+The primary reason for this phenomenon is that the current implementation of 
+Solana's fee market is a pure first-price auction (FPA). There is extensive
+research and empirical evidence that suggests that this mechanism is suboptimal for users.
 
-Unfortunately, naive replication of the 1559 mechanism is however faced with
-problems as Solana is a multi-resource (contextually: local fee-market) environment.
-Because of this copying EIP-1559's core mechanism (as is) will prove to be ineffective.
+There is also extensive research on how to mitigate the externalities of the mechanism and restricting the auction bidspace is the only method that is known to work.
 
-In addition, EIP-1559 is a somewhat invasive change as it requires modification of the
-core protocol. A less invasive implementation that can achieve the same effects as
-(or better than) EIP-1559 without the externalities of SIMD-110 is highly desirable.
+EIP-1559 is an implementation of a restricted bidspace, but it comes with it's own problems including an extreme underutilization of network resources and underutilization of block space (when the base fee is too high.)
+Additionally, a naive replication of the 1559 mechanism on Solana is non-beneficial as Solana is a multi-resource (contextually: local fee-market) environment.
+EIP-1559 is also an invasive change as it requires modification of the core 
+protocol and adds additional overhead to voting nodes who must keep track
+of the base fee.
 
-### Effectiveness as a TFM
-Research suggests that "first-price auctions with an exogenously restricted
-bid space are the only static credible mechanisms". In short, all blockchains should
-strive to implement TFMs that model FPAs with restricted bid spaces.
-
-### Minimalism
-When working on (especially complex) systems, solutions that affect smaller portions
-of the system are always favored over their counterparts for simplicity and ease of
-implementation and maintenance.
+Therefore, a mechanism that can achieve the desired results without any of the externalities discussed above is highly desirable.
 
 ## New Terminology
+- target compute unit utilization; This is the protocol defined target compute unit 
+utilization (can be per block or per account). This is a soft cap on how many
+compute units can be fit in a valid block.
+
+- maximum compute unit utilization; This is the protocol-defined maximum compute
+unit utilization. This is a hard cap on the number of compute units that can be
+packed into a valid block.
+
+- slack: the ratio of target CU-utilization to maximum CU-utilization. It  is a measure of how much congested the corresponding account or global market is.
 
 - recommended priority fee: This is the priority fee that the mechanism "recommends" that
 a transaction pay. It is calculated per account by the *priority fee recommender* based
 on *recent fees paid*. It is similar to but distinct from a per-account EIP-1559 base fee.
 
-- recommended high priority fee: This is the priority fee that the mechanism "recommends"
-that a transaction seeking faster-than-normal inclusion pay. It is a counterpart to the
-recommended priority fee for users seeking faster inclusion and or priority.
+- cache: An in-memory a cache that tracks the most congested accounts, the Exponential
+Moving Average (EMA) of the compute unit utilization, and the recommended priority fees for
+the corresponding accounts.
 
-- cache: Describes a cache that maps the most contentious accounts to the corresponding
-recommended priority and high-priority fees.
-
-- recent fees paid: is the median fee paid per account (or globally) in the three (3)
-most recent blocks.
-
-- recent high fees paid: is the **p90** fee paid per account in the three (3) most recent
-blocks.
-
-- priority fee recommender: a gadget that determines the `recommended priority fee` to be paid
-per account (or globally) based on `recent fees paid`. The algorithm is
-described in a following section.
-
-- contention: This describes how contentious an account is, for this proposal,
-contention is simply calculated as the number of transactions writing to an account.
-
-- `getPriorityFee`: A JSON RPC method to replace the `getRecentPrioritizationFees` or
-`getFeeForMessage` method. The `getPriorityFee` request takes a mandatory list of
+- `getPriorityFee`: A JSON RPC method to replace the `getRecentPrioritizationFees` and
+`getFeeForMessage` methods. The `getPriorityFee` request takes a mandatory list of
 transactions and returns the recommended fee to land a transaction locking all the accounts
 in the list.
 
-- `getHighPriorityFee:` A new JSON RPC method. It takes a mandatory list of accounts and returns
-a recommended priority fee to quickly land a transaction locking all the accounts in the list
+- fee: fee is used loosely throughout this document to refer to compute unit cost.
 
 ## Detailed Design
+Solana's fee market is designed such that only users bidding to access **congested**
+(accounts for which demand is greater than supply) accounts need to pay more. Everyone else
+(that is strictly interested in quick inclusion) only need to pay the minimum fee for inclusion which is determined by the global demand for blockspace.
+Unfortunately, as is the case with FPAs, the correct fee for the desired outcome is undefined and unknown to
+users.
 
-At the core of this proposal is a cache that maps accounts to the recommended priority fee
-(calculation discussed below). The fee is described as a recommendation because rather than
-enforcing that transactions pay (at least) this fee to be included in a block ala EIP-1559
-the fee is supposed to guide users on how much to bid.
+The most useful tools that currently exist are the `getRecentPrioritizationFees` RPC method and other propitery modifications that all do roughly the same thing:
+- take a list of accounts locked by a transaction 
+- return the priority fee paid by a transaction that locked all accounts in the list in the last 150 blocks.
 
-While simpler, functionally, the recommended fee is the same as the base fee in EIP-1559
-in that (given that fee markets are deterministic), it is a good reference point for users
-vying for inclusion.
+These tools, while useful, are subpar because:
+- they do not (correctly) price blockspace; they make recommendations based on (previous) uninformed bids.
+- they waste RPC resources (150 blocks worth of data is far too much, and can even be harmful).
 
-The defining benefit of this design from a TFM point of view is that because this fee is not
-enforced in protocol, it is much more responsive to the market than EIP-1559. It also allows
-blocks to be maximally packed at all times (undesired in EIP-1559) by including transactions
-that don't bid as high as the recommendation.
+Furthermore because different providers have different implementations, there is some loss in efficiency.
 
-Additionally, the fact that the fees are recommendations and not protocol-enforced means validator
-nodes don't need to maintain this cache or even  be aware of it; only RPC nodes that are
-traditionally responsible for responding to these types of requests.
+These are the gaps that this proposal intends to address.
 
-### The cache
+In the proposed system; when a user makes a `getPriorityFee` request to an RPC node; the node checks the attached list of transactions against an in-memory cache that tracks congested accounts and returns the recommended fee for the most expensive (should also be the most congested) account in the list. If none of the accounts in the list are in the cache then the method simply returns the recommended global priority fee. The fee is described as a recommendation because there is no enforcing that transactions pay
+(at least) this fee to be included (EIP-1559 base-fee-style). The recommendation will remain like a normal bid to validators.
 
-The cache is an in-memory cache maintained by RPC nodes that maps accounts to a `fee_data`
-struct.
-
-Let the most recent block seen by the RPC node be `b_n`,
-
- the `fee_data` struct contains the recommended fee `f_r` for `b_n + 1` and the median and p90 fees
- for the corresponding account in the last three blocks (`b_n`, `b_n-1`, `b_n-2`).
+The defining benefits of this approach compared to a protocol-enforced base fee are:
+1. blocks can be maximally packed at all times, and
+2. there is no additional overhead from tracking a base fee on the protocol; only RPC nodes that are already
+responsible for responding to these types of requests have to keep the "cache".
 
 ### RPC Processing Requests
 
-When an RPC node receives a `getPriorityFee` request, based on the request it:
+When an RPC node receives a `getPriorityFee` request it:
 - checks the cache for all the accounts in the accounts list attached.
 - if none of the accounts in the list are in the cache then it simply returns the recommended
 global priority fee.
@@ -122,51 +103,113 @@ global priority fee.
 per-account priority or high-priority fee for the most contentious account (should also
 be the most expensive).
 
-### RPC Processing Blocks
+### The cache
 
-When an RPC node receives `b_n`, it:
-- calculates the global median for `b_n`.
-- calculates the per-account median for transactions in the block.
-- updates the cache with recommendations for `b_n+1`.
+At the core of this proposal is a 
+cache that tracks congested accounts and maps the accounts to the "recommended"
+priority fee (calculation discussed below). Global CU utilization is also tracked.
 
-#### Cache Eviction Policy
+The "cache" is a finite capacity in-memory data structure maintained by RPC nodes that tracks congested accounts and maps accounts to an `AccountData` struct.
 
-- Accounts with their most recent entry older than three blocks i.e., the most recent entry is from a block
-`b_i` where n-i > 3, are evicted from the cache. This is done because an account that does not have any
-transactions in the last three blocks suggests one of two things:
+```Rust
+Cache<Pubkey, AccountData>
+```
 
- 1. The account is no longer contentious and all future accesses should be priced based on global
- fees.
- 2. The global median fee has risen above the recommended fee for that account in which case, users
- should pay the recommended median fee.
+The `AccountData` struct contains:
+- the exponential moving average (EMA) of the compute unit utilization of the associated account in the five most recent blocks,
+- the recommended fee for block n (the most recent block seen by the node),
+- the recommended fee that transactions that want to access the account in the next block (n + 1) should pay.
 
-- If the recommended fee for an account in the cache is less than the global median, the account is
-evicted from the cache.
+```Rust
+struct AccountData {
+	ema_of_cu_utilization_over_the_last_five_blocks // n-4 through n
+	median_fee_in_block_n
+    recommended_priority_fee_to_access_account_in_block_n_plus_one
+}
+```
 
-### Priority Fee Recommender
+The median (as opposed to a previous recommendation) is tracked because it allows the mechanism to detect changes in demand at a particular price point without setting a base fee (that would do so by dropping transactions below the price point).
 
-The priority fee recommender is a gadget that takes the priority fee (median or p90) for the last
-three blocks and contention and returns the recommended priority or (high priority fee) for the
-upcoming block.
+The global median fee and global compute unit utilization are also tracked.
 
-The gadget looks at the previous data and based on the trends makes recommendations.
-The exact mathematical relation is TBD but a rough idea is that:
+```Rust
+struct GlobalData {
+	ema_of_global_cu_utilization_over_the_last_five_blocks
+	median_fee_global_in_block_n
+	recommended_priority_fee_global_in_block_n_plus_one
+}
+```
 
-- if the fee paid is increasing block-on-block, recommend a higher fee than the
-previous block,
-- if the fee paid is reducing, and contention is increasing, recommend a lower fee,
-- if the fee paid is neither increasing nor decreasing, recommend the average of the last three
-blocks.
+### Target and Maximum Compute Unit Utilization
 
-Given that transaction arrival rate can be closely modeled by a Poisson's distribution, an
-exponential controller is the best choice for a governor
+This proposal introduces a target compute unit utilization value at both block and account level.
+
+Settting this value is required because it is necessary to allow the TFM to reliably determine when demand outstrips supply. If there is no target utilization amount it is difficult to detect if demand matches or outstrips supply. Additionally, distinguishing between the two values improves the UX by allowing additional transactions when there is a sudden increase in demand.
+
+The greater the *slack* (difference between target and maximum compute unit utilization) the more pronounced the aforementioned effects. However, setting the target CU utilization to half of the maximum compute unit uilization like in EIP-1559 results in severe underutilization of block space. Because of this, it is proposed that the target CU utiization be 85% of the maximum CU utilization (i.e., target cu_utilization = $0.85$ * max cu utilization) to balance the benefits and externalities of setting a target compute unit utilization.
+
+Keep in mind that this does not require any changes to the core protocol.
+
+### How the recommended priority fee is calculated
+
+The recommended priority fees are determined based on a simple princriple; if the EMA of CU-utilization is lower than the target, recommend a lower fee than the median of the previous block and if it is higher, recommend a higher fee. The degree of how much higher (or lower) depends on the difference between the observed value and target. Mathematically, this can be expressed as:   
+
+let $n$ be the most recent block seen by the node (such that the next block is $o$)  
+let $f^g_n$ be the global median fee in block $n$  
+let $f^g_o$ be the recommended global fee for block $o \ni  o = n + 1$  
+let $\mu^g_{\lambda}$ be the  EMA of global compute unit utilization over the last five blocks  
+let $\mu^g_{\tau}$ be the target per block compute unit utilization  
+let $\theta$ be a sensitivity parameter 
+
+The recommended global fee for block $o$ is determined by:  
+if $\mu^g_{\tau} > \mu^g_{\lambda}$,  
+$\ \ \ \ f^g_o = f^g_n * exp(\theta, \ (\frac{\mu^g_{\lambda}}{\mu^g_{\tau}} -1))$    
+  
+if $\mu^g_{\tau} < \mu^g_{\lambda}$,  
+$\ \ \ \ f^g_o = f^g_n * (1 - exp(\theta, \ (\frac{\mu^g_{\lambda}}{\mu^g_{\tau}} -1)))$
+
+
+let $n$ be the most recent block seen by the node (such that the next block is $o$)  
+let $f^{\alpha}_n$ be the median fee for account $\alpha$ in block $n$  
+let $f^{\alpha}_o$ be the recommended global fee for block $o \ni  o = n + 1$  
+let $\mu^{\alpha}_{\lambda}$ be the  EMA of compute unit utilization for account ${\alpha}$ over the last five blocks  
+let $\mu^{\alpha}_{\tau}$ be the target per block compute unit utilization  
+let $\theta$ be a sensitivity parameter 
+
+The recommended per account fee for block $o$ is determined by:  
+if $\mu^{\alpha}_{\tau} > \mu^{\alpha}_{\lambda}$,  
+$\ \ \ \ f^{\alpha}_o = f^{\alpha}_n * exp(\theta, \ (\frac{\mu^{\alpha}_{\lambda}}{\mu^{\alpha}_{\tau}} -1))$    
+  
+if $\mu^{\alpha}_{\tau} <  \mu^{\alpha}_{\lambda}$,  
+$\ \ \ \ f^{\alpha}_o = f^{\alpha}_n * (1 - exp(\theta, \ (\frac{\mu^{\alpha}_{\lambda}}{\mu^{\alpha}_{\tau}} -1)))$  
+
+As is observable from the above, the controller is exponential. An exponential controller was chosen for two reasons:
+1. There is no desire to impose additional costs on users unless they are bidding for congested accounts. Because of this, the slack (difference between target and maximum utilization) must be as small as possible. Given the small slack, aggressive responses are crucial even if they cause some loss in efficiency. However, because the TFM does not enforce the base fee, as long as there is sufficient blockspace, users with lower willingness to pay can still be included.
+2. Research shows that transaction arrival can be modelled by a Poisson's process and expoenential controllers are effective for this class of problems given the additional desiderata.
+
+### Cache updates and eviction
+
+Every RPC node indepently updates its cache when it receives a new block.
+During each update, the global and per account EMAs are updated and the recommended fees for the upcoming block are calculated according to the relations above.
+
+Also the entries with the least congestion are evicted and the most congested accounts not already in the cache are inserted.
+
+To allow effective tracking of congested accounts, we propose tracking up to $5 * ceil(\frac{max \ block \ compute \ unit \ utilization}{target \ per \ account \ compute \ unit \ utilization})$ accounts with utilization greater than 50% of the target utilization.
+
+This value is based on the fact that:
+1. the EMA is tracked over 5 blocks
+2. the maximum number of accounts that can satisfy the criteria of being congested is given by $ceil(\frac{max \ block \ compute \ unit \ utilization}{target \ per \ account \ compute \ unit \ utilization})$.
+
+This is a simple but effective way to set an upper bound on the cache size, it is also small enough that there is no meaningful overhead from keeping it--under the current conditions (48 M CUs per block and 12M per CUs per account), the cache will have a capacity of just 25.
+
+Finally we propose a (maximum) churn rate of 5 entries per slot for the same reason as above.
 
 ## Alternatives Considered
 
 What alternative designs were considered and what pros/cons does this feature
 have relative to them?
 
-1. EIP-1559-like system with sta protocol-enforced base fee.
+1. EIP-1559-like system with a protocol-enforced base fee.
 The primary alternative consideration is a per-account EIP-1559 implementation. But for reasons
 already discussed in the main body of this text, the proposed implementation is superior to
 EIP-1559.
@@ -175,38 +218,16 @@ EIP-1559.
 In addition to the features above, burning the per signature base fee was also considered but the benefits
 of such a mechanism are debatable. Although, there are no known drawbacks.
 
-3. Excluding high-priority fees.
-Excluding high-priority fees and all associated data and methods was considered.
-However, users generally fall into one of two classes--users who want to pay the minimum amount required to
-be included in the next block and users willing to pay extra for some priority. The recommended priority fee
-serves the first class while the high priority fee serves the second.
-
-4. Doing Nothing.
+3. Doing Nothing.
 Users will continue to overbid (best case) and the UX will continue to be subpar.
-
-5. Blocking transactions that contain a fee less than the median.
-It's possible to implement the mechanism such that RPC nodes drop all transactions with fees less than the recommended
-global fee. This has the same effect as having an in-protocol base fee. This was left out because there's not much
-evidence that suggests that users will send low-fee transactions in hopes of landing if fee markets are deterministic.
-However, should the need ever arise to add this feature, it should be trivial to do so.
-
-6. Having a max cap on the cache size.
-At the moment, the cache size is unbounded. Judging from the number of contentious accounts on mainnet-beta, it's
-unlikely that the cache will be very large but in the future, it might be necessary to sacrifice some efficiency by setting
-a limit on the cache size. In such a scenario, when the cache is updated at the end of every slot, the bottom X accounts
-can be replaced by the most contentious accounts in the new block.
-
-7. Using contention to scale the recommendations.
-In the current calculation for recommended fee contention is not explicitly considered, it can be useful as more
-contentious accounts should have prices raised more aggressively.
 
 ## Impact
 
 - validators: unaffected
-- core contributors: unaffected
+- core contributors: unaffected.
 - RPC Nodes: They improve transaction landing probability for users.
-- users: Users can make better-informed bids.
-- dapp developers: they will have to switch to the new method and conform to it's format
+- users: Users can make better-informed bids and enjoy a significantly better experience. They should also pay less for uncongested accounts.
+- dapp developers: they will have to rewrite applications and switch to the new method.
 
 ## Security Considerations
 
@@ -214,10 +235,9 @@ None
 
 ## Drawbacks
 
-While it only affects non-critical parts of the codebase, this is still a complex change to the TFM.
+Extreme care must be taken to ensure that TFM modifications do not create attack vectors, especially for myopic block producers. But seeing as the new proposal does not actually modify any parts of the existing mechanism, by reduction, it is as sound as the existing mechanism. 
+However, as discussed earlier, the existing TFM is already not incentive compatible for myopic block producers and although this proposal does not cmake it worse, it does not make it better either.
 
 ## Backwards Compatibility
 
-For the sake of adoption, this proposal favors deprecating other fee request RPC methods so
-developers use this one and bids are standardized. That means the implementation might not be
-backward compatible.
+Yes, core code remain unchanged.
