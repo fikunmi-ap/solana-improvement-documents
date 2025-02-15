@@ -248,10 +248,10 @@ let $\mu^{\alpha}\_{\tau}$ be the target per block CU utilization
 let $\theta$ be a sensitivity parameter  
 
 if $\mu^{\alpha}\_{\tau} > \mu^{\alpha}\_{\lambda}$,  
-$\ \ \ \ f^{\alpha}\_o = max \ \{f^{\alpha}\_n * exp(\theta, \ (\frac{\mu^{\alpha}\_{\lambda}}{\mu^{\alpha}\_{\tau}} -1)), \ f^g_o \}$
+$\ \ \ \ f^{\alpha}\_o = max \ ( f^{\alpha}\_n * exp(\theta, \ (\frac{\mu^{\alpha}\_{\lambda}}{\mu^{\alpha}\_{\tau}} -1))), \ f^g_o )$
 
 if $\mu^{\alpha}\_{\tau} < \mu^{\alpha}\_{\lambda}$,  
-$\ \ \ \ f^{\alpha}\_o = max \ \{f^{\alpha}\_n * (1 - exp(\theta, \ (\frac{\mu^{\alpha}\_{\lambda}}{\mu^{\alpha}\_{\tau}} -1))), \ f^g_o \}$
+$\ \ \ \ f^{\alpha}\_o = max \ ( f^{\alpha}\_n * (1 - exp(\theta, \ (\frac{\mu^{\alpha}\_{\lambda}}{\mu^{\alpha}\_{\tau}} -1))), \ f^g_o )$
 
 As is observable from the above, the controller is exponential. An exponential
 controller was chosen for two reasons:
